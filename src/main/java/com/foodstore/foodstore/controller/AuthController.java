@@ -24,4 +24,11 @@ public class AuthController {
     public ResponseEntity<User> login(@RequestBody User user) {
         return ResponseEntity.ok(authService.login(user.getEmail(), user.getPassword()));
     }
+
+    @PostMapping("/register-admin")
+    public ResponseEntity<User> registerAdmin(@RequestBody User user) {
+        user.setRole("admin"); // Esto fuerza el rol antes de registrarlo
+        return ResponseEntity.status(201).body(authService.register(user));
+    }
+
 }

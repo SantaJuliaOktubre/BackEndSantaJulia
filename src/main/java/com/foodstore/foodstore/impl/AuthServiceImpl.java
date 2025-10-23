@@ -24,9 +24,15 @@ public class AuthServiceImpl implements AuthService {
         }
 
         user.setPassword(Sha256Util.hash(user.getPassword()));
-        user.setRole("cliente"); // Por defecto cliente
+
+        //Solo si no tiene rol asignado, se asigna "cliente"
+        if (user.getRole() == null || user.getRole().isEmpty()) {
+            user.setRole("cliente");
+        }
+
         return userRepository.save(user);
     }
+
 
     @Override
     public User login(String email, String password) {
