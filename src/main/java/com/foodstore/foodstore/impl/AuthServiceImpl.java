@@ -28,6 +28,8 @@ public class AuthServiceImpl implements AuthService {
         //Solo si no tiene rol asignado, se asigna "cliente"
         if (user.getRole() == null || user.getRole().isEmpty()) {
             user.setRole("cliente");
+        } else {
+            user.setRole(user.getRole().toLowerCase());
         }
 
         return userRepository.save(user);
@@ -37,13 +39,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public User login(String email, String password) {
         Optional<User> userOpt = userRepository.findByEmail(email);
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            String hashedPassword = Sha256Util.hash(password);
-            if (user.getPassword().equals(hashedPassword)) {
-                return user;
-            }
+
+        if (userOpt.isEmpty()) {
+            return null;
         }
-        throw new RuntimeException("Credenciales incorrectas");
+
+        User user = userOpt.get();
+        String hashedPassword = Sha256Util.hash(password);
+
+        if (!user.getPassword().equals(hashedPassword)) {
+            return null;
+        }
+
+        return user;
     }
+
 }
