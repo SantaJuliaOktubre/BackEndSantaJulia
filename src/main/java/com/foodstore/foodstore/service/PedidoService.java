@@ -10,4 +10,3 @@ public interface PedidoService {
     void eliminarPedido(Long id);
     List<Pedido> obtenerPorCliente(String cliente);
 }
-
