@@ -7,5 +7,6 @@ import java.util.List;
 
 @Repository
 public interface PedidoRepository extends JpaRepository<Pedido, Long> {
-    List<Pedido> findByCliente(String cliente);
+    // Esto busca pedidos cuyo campo 'cliente' contenga la cadena (ignorando mayúsculas/minúsculas)
+    List<Pedido> findByClienteContainingIgnoreCase(String cliente);
 }

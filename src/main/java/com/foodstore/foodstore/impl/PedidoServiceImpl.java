@@ -4,47 +4,51 @@ import com.foodstore.foodstore.entity.Pedido;
 import com.foodstore.foodstore.entity.Product;
 import com.foodstore.foodstore.repository.PedidoRepository;
 import com.foodstore.foodstore.repository.ProductRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodstore.foodstore.service.PedidoService;
 import org.springframework.stereotype.Service;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.*;
+
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class PedidoServiceImpl implements PedidoService {
 
     private final PedidoRepository pedidoRepository;
     private final ProductRepository productRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public PedidoServiceImpl(PedidoRepository pedidoRepository, ProductRepository productRepository) {
         this.pedidoRepository = pedidoRepository;
         this.productRepository = productRepository;
+        this.objectMapper = new ObjectMapper();
     }
 
     @Override
     @Transactional
     public Pedido crearPedido(Pedido pedido) throws Exception {
-        if (pedido.getItemsJson() == null || pedido.getItemsJson().isBlank()) {
-            throw new Exception("El pedido debe contener items");
+        // Parsear itemsJson
+        List<CartItem> items = objectMapper.readValue(pedido.getItemsJson(), new TypeReference<List<CartItem>>() {});
+
+        // Validar stock
+        for (CartItem item : items) {
+            Product p = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new IllegalStateException("Producto no encontrado: " + item.getProductId()));
+            if (p.getStock() < item.getQty()) {
+                throw new IllegalStateException("Stock insuficiente para: " + p.getName());
+            }
         }
 
-        List<Map<String,Object>> items = objectMapper.readValue(pedido.getItemsJson(), List.class);
-
-        for (Map<String,Object> it : items) {
-            Integer prodId = (Integer) (it.get("productId") instanceof Integer ? it.get("productId") : ((Number)it.get("productId")).intValue());
-            Integer qty = (Integer) (it.get("qty") instanceof Integer ? it.get("qty") : ((Number)it.get("qty")).intValue());
-
-            Optional<Product> pOpt = productRepository.findById(Long.valueOf(prodId));
-            if (pOpt.isEmpty()) throw new Exception("Producto no encontrado: " + prodId);
-            Product p = pOpt.get();
-            if (p.getStock() < qty) throw new Exception("Stock insuficiente para: " + p.getName());
-
-            p.setStock(p.getStock() - qty);
+        // Reducir stock
+        for (CartItem item : items) {
+            Product p = productRepository.findById(item.getProductId()).get();
+            p.setStock(p.getStock() - item.getQty());
             productRepository.save(p);
         }
 
-        pedido.setEstado("recibido");
+        pedido.setEstado("recibido"); // Estado inicial
         return pedidoRepository.save(pedido);
     }
 
@@ -60,6 +64,18 @@ public class PedidoServiceImpl implements PedidoService {
 
     @Override
     public List<Pedido> obtenerPorCliente(String cliente) {
-        return pedidoRepository.findByCliente(cliente);
+        if (cliente == null || cliente.isBlank()) return pedidoRepository.findAll();
+        return pedidoRepository.findByClienteContainingIgnoreCase(cliente);
+    }
+
+    // Clase interna para mapear itemsJson
+    public static class CartItem {
+        private Long productId;
+        private Integer qty;
+
+        public Long getProductId() { return productId; }
+        public void setProductId(Long productId) { this.productId = productId; }
+        public Integer getQty() { return qty; }
+        public void setQty(Integer qty) { this.qty = qty; }
     }
 }
