@@ -11,13 +11,14 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/pedidos")
 @CrossOrigin(
         origins = "http://localhost:5174",
         allowedHeaders = {"Content-Type", "Authorization"},
-        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE, RequestMethod.OPTIONS},
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS},
         allowCredentials = "true"
 )
 public class PedidoController {
@@ -84,6 +85,11 @@ public class PedidoController {
         }
     }
 
+    /**
+     * Listar pedidos.
+     * Si se pasa ?cliente=email se filtra por cliente,
+     * si no se pasa cliente (o es vacío) devuelve todos los pedidos.
+     */
     @GetMapping(produces = "application/json")
     public ResponseEntity<List<Pedido>> listarPorCliente(@RequestParam(value = "cliente", required = false) String cliente) {
         try {
@@ -94,5 +100,29 @@ public class PedidoController {
             logger.error("Error listando pedidos", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    /**
+     * Actualiza solo el estado del pedido (ej: recibido, preparando, enviado, entregado, cancelado).
+     * Body esperado: { "status": "nuevo_estado" }
+     */
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> actualizarEstado(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        try {
+            String status = body.get("status");
+            if (status == null || status.isBlank()) {
+                return ResponseEntity.badRequest().body("Estado inválido");
+            }
+
+            pedidoService.actualizarEstado(id, status);
+            return ResponseEntity.ok(Map.of("id", id, "status", status));
+        } catch (IllegalArgumentException e) {
+            logger.warn("Pedido no encontrado: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error actualizando estado del pedido id=" + id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+
     }
 }
