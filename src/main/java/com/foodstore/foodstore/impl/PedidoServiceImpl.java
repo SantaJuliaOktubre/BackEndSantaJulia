@@ -68,6 +68,37 @@ public class PedidoServiceImpl implements PedidoService {
         return pedidoRepository.findByClienteContainingIgnoreCase(cliente);
     }
 
+    /**
+     * Actualiza únicamente el estado del pedido.
+     */
+    @Override
+    @Transactional
+    public void actualizarEstado(Long id, String status) throws Exception {
+        if (status == null || status.isBlank()) {
+            throw new IllegalArgumentException("Estado inválido");
+        }
+
+        Pedido pedido = pedidoRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Pedido no encontrado: " + id));
+
+        String estadoActual = pedido.getEstado();
+
+        if ("cancelado".equalsIgnoreCase(status)
+                && (estadoActual == null || !"cancelado".equalsIgnoreCase(estadoActual))) {
+            List<CartItem> items = objectMapper.readValue(
+                    pedido.getItemsJson(), new TypeReference<List<CartItem>>() {});
+            for (CartItem item : items) {
+                Product p = productRepository.findById(item.getProductId())
+                        .orElseThrow(() -> new IllegalStateException("Producto no encontrado: " + item.getProductId()));
+                p.setStock(p.getStock() + item.getQty());
+                productRepository.save(p);
+            }
+        }
+
+        pedido.setEstado(status);
+        pedidoRepository.save(pedido);
+    }
+
     // Clase interna para mapear itemsJson
     public static class CartItem {
         private Long productId;
@@ -79,3 +110,4 @@ public class PedidoServiceImpl implements PedidoService {
         public void setQty(Integer qty) { this.qty = qty; }
     }
 }
+
